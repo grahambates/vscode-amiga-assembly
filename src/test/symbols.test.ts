@@ -21,7 +21,7 @@ describe("Symbols reader Tests", function () {
         const macros = symbolFile.getMacros();
         expect(definedSymbols.length).to.be.equal(60);
         const referedSymbols = symbolFile.getReferredSymbols();
-        expect(referedSymbols.length).to.be.equal(318);
+        expect(referedSymbols.length).to.be.equal(531);
         const firstDefined = definedSymbols[1];
         expect(firstDefined.getLabel()).to.be.equal("COPPER_WAIT");
         let count = 0;

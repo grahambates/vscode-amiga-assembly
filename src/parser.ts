@@ -20,6 +20,8 @@ export class ASMLine {
     static macrosRegExps?: Array<RegExp>;
     label = "";
     instruction = "";
+    mnemonic = "";
+    size = "";
     data = "";
     comment = "";
     raw = "";
@@ -32,6 +34,9 @@ export class ASMLine {
     labelRange: Range;
     spacesLabelToInstructionRange: Range;
     instructionRange: Range;
+    mnemonicRange: Range;
+    sizeRange: Range;
+    instructionSeparatorRange: Range;
     spacesInstructionToDataRange: Range;
     dataRange: Range;
     spacesDataToCommentRange: Range;
@@ -70,6 +75,9 @@ export class ASMLine {
         this.labelRange = new Range(new Position(lineNumber, 0), new Position(lineNumber, 0));
         this.spacesLabelToInstructionRange = new Range(new Position(lineNumber, 0), new Position(lineNumber, 0));
         this.instructionRange = new Range(new Position(lineNumber, 0), new Position(lineNumber, 0));
+        this.mnemonicRange = new Range(new Position(lineNumber, 0), new Position(lineNumber, 0));
+        this.instructionSeparatorRange = new Range(new Position(lineNumber, 0), new Position(lineNumber, 0));
+        this.sizeRange = new Range(new Position(lineNumber, 0), new Position(lineNumber, 0));
         this.spacesInstructionToDataRange = new Range(new Position(lineNumber, 0), new Position(lineNumber, 0));
         this.dataRange = new Range(new Position(lineNumber, 0), new Position(lineNumber, 0));
         this.spacesDataToCommentRange = new Range(new Position(lineNumber, 0), new Position(lineNumber, 0));
@@ -229,6 +237,22 @@ export class ASMLine {
                 } else {
                     this.lineType = ASMLineType.LABEL;
                 }
+            }
+
+            // Parse components within instruction
+            const dotIndex = this.instruction.indexOf(".");
+            if (dotIndex > 0) {
+                const { start, end } = this.instructionRange;
+                const mnemonicEnd = new Position(end.line, start.character + dotIndex);
+                const sizeStart = new Position(start.line, start.character + dotIndex + 1);
+                this.mnemonic = this.instruction.substring(0, dotIndex);
+                this.mnemonicRange = new Range(start, mnemonicEnd);
+                this.size = this.instruction.substring(dotIndex + 1);
+                this.sizeRange = new Range(sizeStart, end);
+                this.instructionSeparatorRange = new Range(mnemonicEnd, sizeStart);
+            } else {
+                this.mnemonic = this.instruction;
+                this.mnemonicRange = this.instructionRange;
             }
         }
     }

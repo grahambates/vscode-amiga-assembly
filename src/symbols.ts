@@ -43,6 +43,9 @@ export class SymbolFile {
                         this.referredSymbols.push(new Symbol(symbol, this, range));
                     }
                 }
+                if (asmLine.mnemonic) {
+                    this.referredSymbols.push(new Symbol(asmLine.mnemonic, this, asmLine.mnemonicRange));
+                }
             }
             const instruct = asmLine.instruction.toLowerCase();
             if (asmLine.label.length > 0) {

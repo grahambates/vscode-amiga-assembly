@@ -28,11 +28,7 @@ export class M68kHoverProvider implements vscode.HoverProvider {
         const asmLine = new ASMLine(line.text, line);
         // Detect where is the cursor
         if (asmLine.instructionRange && asmLine.instructionRange.contains(position) && (asmLine.instruction.length > 0)) {
-            let keyInstruction = asmLine.instruction;
-            const idx = keyInstruction.indexOf('.');
-            if (idx > 0) {
-                keyInstruction = keyInstruction.substr(0, idx);
-            }
+            const keyInstruction = asmLine.mnemonic;
             if (!token.isCancellationRequested) {
                 const [hoverInstruction, hoverDirective, macro] = await Promise.all([
                     this.documentationManager.getInstruction(keyInstruction.toUpperCase()),

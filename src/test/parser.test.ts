@@ -202,6 +202,21 @@ describe("Parser Tests", function () {
             expect(asmLine.label).to.be.empty;
             expect(asmLine.lineType).to.be.equal(ASMLineType.INSTRUCTION);
         });
+        it("Should parse components within an instruction", function () {
+            let asmLine = new ASMLine(" move.w d0,d1");
+            expect(asmLine.instruction).to.be.equal("move.w");
+            expect(asmLine.instructionRange).to.be.eql(new Range(new Position(0, 1), new Position(0, 7)));
+            expect(asmLine.mnemonic).to.be.equal("move");
+            expect(asmLine.mnemonicRange).to.be.eql(new Range(new Position(0, 1), new Position(0, 5)));
+            expect(asmLine.size).to.be.equal("w");
+            expect(asmLine.sizeRange).to.be.eql(new Range(new Position(0, 6), new Position(0, 7)));
+            expect(asmLine.instructionSeparatorRange).to.be.eql(new Range(new Position(0, 5), new Position(0, 6)));
+            asmLine = new ASMLine(" move d0,d1");
+            expect(asmLine.instruction).to.be.equal("move");
+            expect(asmLine.instructionRange).to.be.eql(new Range(new Position(0, 1), new Position(0, 5)));
+            expect(asmLine.mnemonic).to.be.equal("move");
+            expect(asmLine.mnemonicRange).to.be.eql(new Range(new Position(0, 1), new Position(0, 5)));
+        });
         it("Should parse an entire line", function () {
             let asmLine = new ASMLine(".mylabel\t\tmove.l #mempos,d1     ; mycomment");
             expect(asmLine.label).to.be.equal(".mylabel");
