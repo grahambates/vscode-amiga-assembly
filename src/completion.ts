@@ -10,136 +10,173 @@ export class M68kCompletionItemProvider implements vscode.CompletionItemProvider
     documentationManager: DocumentationManager;
     definitionHandler: M68kDefinitionHandler;
     language: M68kLanguage;
+
     constructor(documentationManager: DocumentationManager, definitionHandler: M68kDefinitionHandler, language: M68kLanguage) {
         this.documentationManager = documentationManager;
         this.definitionHandler = definitionHandler;
         this.language = language;
     }
+
     public async provideCompletionItems(document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken): Promise<vscode.CompletionItem[]> {
-        let completions = new Array<vscode.CompletionItem>();
-        let range = document.getWordRangeAtPosition(position);
+        const completions: vscode.CompletionItem[] = [];
+        const completionLabels: string[] = [];
+
+        let wordRange = document.getWordRangeAtPosition(position);
         const line = document.lineAt(position.line);
-        const text = line.text;
+        const asmLine = new ASMLine(line.text, line);
+
         let lastChar = "";
         if (position.character > 0) {
             lastChar = line.text.charAt(position.character - 1);
         }
-        const asmLine = new ASMLine(text, line);
-        if (range) {
-            let prefix = "";
-            if (line.text.charAt(range.start.character -1) === ".") {
-                // Extend range to include leading dot
-                range = new vscode.Range(
-                    new vscode.Position(range.start.line, range.start.character - 1),
-                    range.end
-                );
-                // Find previous global label
-                for (let i = range.start.line; i >= 0; i--) {
-                    const match = document.lineAt(i).text.match(/^(\w+)\b/);
-                    if (match) {
-                        prefix = match[0];
-                        break;
-                    }
+
+        // Which part of the ASM line is the word in?
+        const isInComment = asmLine.commentRange.contains(position);
+        const isInMnemonic = asmLine.mnemonicRange.contains(position);
+        const isInData = asmLine.dataRange.contains(position);
+        const isInSize = !wordRange && (lastChar === ".") && asmLine.instructionRange.contains(position.translate(undefined, -1));
+
+        // Instruction size completions:
+        if (isInSize) {
+            return this.provideCompletionsForSize(document, position);
+        }
+
+        // No completions:
+        if (isInComment || !wordRange) {
+            return [];
+        }
+
+        // File completions for include directive:
+
+        if (!isInMnemonic && asmLine.instruction.toLowerCase() === "include") {
+            return this.provideCompletionForIncludes(asmLine, document, position);
+        }
+
+        let labelPrefix = ""; 
+
+        // Adjustments to word/range for local labels:
+        const isLocalLabel = line.text.charAt(wordRange.start.character -1) === ".";
+        if (isLocalLabel) {
+            // Extend range to include leading dot
+            wordRange = new vscode.Range(
+                new vscode.Position(wordRange.start.line, wordRange.start.character - 1),
+                wordRange.end
+            );
+            // Find previous global label
+            for (let i = wordRange.start.line; i >= 0; i--) {
+                const match = document.lineAt(i).text.match(/^(\w+)\b/);
+                if (match) {
+                    labelPrefix = match[0];
+                    break;
                 }
             }
-            const word = prefix + document.getText(range);
-            const isInComment = (range.intersection(asmLine.commentRange) !== undefined);
-            const isInInstruction = (range.intersection(asmLine.instructionRange) !== undefined);
-            if ((!isInComment) && ((!isInInstruction) || ((lastChar !== ".") && (!asmLine.instruction.includes("."))))) {
-                const labelsAdded = new Array<string>();
-                const isInData = (range.intersection(asmLine.dataRange) !== undefined);
-                // In the documentation
-                const values = await this.documentationManager.findKeywordStartingWith(word);
-                if (values) {
-                    for (const value of values) {
-                        let label = value.name;
-                        let kind = vscode.CompletionItemKind.Function;
-                        const isMnemonic = value.type === DocumentationType.INSTRUCTION || value.type === DocumentationType.DIRECTIVE
-                        if (isInData) {
-                            if (isMnemonic) {
-                                continue;
-                            } else {
-                                if (value.type === DocumentationType.REGISTER || value.type === DocumentationType.CPU_REGISTER) {
-                                    if (word[0] === word[0].toLowerCase()) {
-                                        label = label.toLowerCase()
-                                    }
-                                    kind = vscode.CompletionItemKind.Variable;
-                                } else if (word.startsWith("_LVO")) {
-                                    label = "_LVO" + label;
-                                }
-                            }
-                        } else {
-                            if (!isMnemonic) {
-                                continue;
-                            }
-                            if (word[0] === word[0].toUpperCase()) {
-                                label = label.toUpperCase()
-                            }
-                        }
-                        if (isDocumentationLazy(value)) {
-                            await value.loadDescription();
-                        }
-                        const completion = new vscode.CompletionItem(label, kind);
-                        completion.detail = value.detail;
-                        completion.documentation = new vscode.MarkdownString(value.description);
-                        completions.push(completion);
-                        labelsAdded.push(label);
-                    }
-                }
-                if (isInData) {
-                    // Look for the include instruction
-                    if (asmLine.instruction.toLowerCase() === "include") {
-                        completions = await this.provideCompletionForIncludes(asmLine, document, position);
-                    } else {
-                        // In the current symbols
-                        const labels = this.definitionHandler.findLabelStartingWith(word);
-                        for (const [label, symbol] of labels.entries()) {
-                            if (!labelsAdded.includes(label)) {
-                                const kind = vscode.CompletionItemKind.Function;
-                                const completion = new vscode.CompletionItem(label.substring(prefix.length), kind);
-                                const filename = symbol.getFile().getUri().path.split("/").pop();
-                                const line = symbol.getRange().start.line;
-                                completion.detail =  "label " + filename + ":" + line;
-                                completion.range = { replacing: range, inserting: range }
-                                completions.push(completion);
-                                labelsAdded.push(label);
-                            }
-                        }
-                        const variables: Map<string, string | undefined> = this.definitionHandler.findVariableStartingWith(word);
-                        for (const [variable, value] of variables.entries()) {
-                            if (!labelsAdded.includes(variable)) {
-                                const kind = vscode.CompletionItemKind.Variable;
-                                const completion = new vscode.CompletionItem(variable, kind);
-                                completion.detail = value;
-                                completion.range = { replacing: range, inserting: range }
-                                completions.push(completion);
-                            }
-                        }
-                    }
-                } else {
-                    const macros = this.definitionHandler.findMacroStartingWith(word);
-                    for (const [label] of macros.entries()) {
-                        if (!labelsAdded.includes(label)) {
-                            const kind = vscode.CompletionItemKind.Function;
-                            const completion = new vscode.CompletionItem(label, kind);
-                            completion.detail =  "macro";
-                            completions.push(completion);
-                            labelsAdded.push(label);
-                        }
-                    }
+        }
+
+        const word = labelPrefix + document.getText(wordRange);
+
+        // Documentation completions:
+
+        let docKeywords = await this.documentationManager.findKeywordStartingWith(word);
+
+        const mnemonicTypes = [DocumentationType.INSTRUCTION, DocumentationType.DIRECTIVE];
+        const registerTypes = [DocumentationType.REGISTER, DocumentationType.CPU_REGISTER];
+
+        // Filter by type based on position:
+        if (isInMnemonic) {
+            docKeywords = docKeywords.filter(k => mnemonicTypes.includes(k.type));
+        } else {
+            docKeywords = docKeywords.filter(k => !mnemonicTypes.includes(k.type));
+        }
+
+        // Lazy load all descriptions
+        await Promise.all(docKeywords.map(k => 
+            isDocumentationLazy(k) ? k.loadDescription() : null)
+        );
+
+        for (const docKeyword of docKeywords) {
+            const isRegister = registerTypes.includes(docKeyword.type)
+            let label = docKeyword.name;
+
+            // Match input case for registers
+            if (isRegister) {
+                if (word[0] === word[0].toLowerCase()) {
+                    label = label.toLowerCase()
                 }
             }
-        } else if ((lastChar === ".") && asmLine.instructionRange.contains(position.translate(undefined, -1))) {
-            const localRange = document.getWordRangeAtPosition(position.translate(undefined, -1));
-            const word = document.getText(localRange);
-            const extensions = this.language.getExtensions(word.toLowerCase());
-            const isUpper = word === word.toUpperCase();
-            if (extensions) {
-                for (let ext of extensions) {
-                    const text = isUpper ? ext.toUpperCase() : ext;
-                    const completion = new vscode.CompletionItem(text, vscode.CompletionItemKind.Unit);
+            // Match input case for mnemonics
+            const isMnemonic = mnemonicTypes.includes(docKeyword.type);
+            if (isMnemonic && word[0] === word[0].toUpperCase()) {
+                label = label.toUpperCase()
+            }
+            // Add optional _LVO prefix for library functions
+            if (isInData && word.startsWith("_LVO")) {
+                label = "_LVO" + label;
+            }
+
+            const kind = isRegister ?  vscode.CompletionItemKind.Variable : vscode.CompletionItemKind.Function;
+            const completion = new vscode.CompletionItem(label, kind);
+            completion.detail = docKeyword.detail;
+            completion.documentation = new vscode.MarkdownString(docKeyword.description);
+            completions.push(completion);
+            completionLabels.push(label);
+        }
+
+        // Symbol definition completions:
+
+        if (isInMnemonic) {
+            // Macro symbols:
+            const macros = this.definitionHandler.findMacroStartingWith(word);
+            for (const [label] of macros.entries()) {
+                if (!completionLabels.includes(label)) {
+                    const kind = vscode.CompletionItemKind.Function;
+                    const completion = new vscode.CompletionItem(label, kind);
+                    completion.detail =  "macro";
+                    completions.push(completion);
+                    completionLabels.push(label);
+                }
+            }
+        } else {
+            // Label symbols:
+            const labels = this.definitionHandler.findLabelStartingWith(word);
+            for (const [label, symbol] of labels.entries()) {
+                if (!completionLabels.includes(label)) {
+                    const kind = vscode.CompletionItemKind.Function;
+                    const completion = new vscode.CompletionItem(label.substring(labelPrefix.length), kind);
+                    const filename = symbol.getFile().getUri().path.split("/").pop();
+                    const line = symbol.getRange().start.line;
+                    completion.detail =  "label " + filename + ":" + line;
+                    completion.range = { replacing: wordRange, inserting: wordRange }
+                    completions.push(completion);
+                    completionLabels.push(label);
+                }
+            }
+            // Varaible symbols:
+            const variables = this.definitionHandler.findVariableStartingWith(word);
+            for (const [variable, value] of variables.entries()) {
+                if (!completionLabels.includes(variable)) {
+                    const kind = vscode.CompletionItemKind.Variable;
+                    const completion = new vscode.CompletionItem(variable, kind);
+                    completion.detail = value;
+                    completion.range = { replacing: wordRange, inserting: wordRange }
                     completions.push(completion);
                 }
+            }
+        } 
+
+        return completions;
+    }
+
+    private provideCompletionsForSize(document: vscode.TextDocument, position: vscode.Position): vscode.CompletionItem[] {
+        const completions: vscode.CompletionItem[] = [];
+        const localRange = document.getWordRangeAtPosition(position.translate(undefined, -1));
+        const word = document.getText(localRange);
+        const extensions = this.language.getExtensions(word.toLowerCase());
+        if (extensions) {
+            const isUpper = word === word.toUpperCase();
+            for (let ext of extensions) {
+                const text = isUpper ? ext.toUpperCase() : ext;
+                const completion = new vscode.CompletionItem(text, vscode.CompletionItemKind.Unit);
+                completions.push(completion);
             }
         }
         return completions;

@@ -226,13 +226,14 @@ describe("Completion Tests", function () {
         });
         it("Should not return completion in a comment", async function () {
             const cp = new M68kCompletionItemProvider(documentationManager, state.getDefinitionHandler(), await state.getLanguage());
-            const document = new DummyTextDocument();
+            let document = new DummyTextDocument();
             let position = new Position(0, 4);
             const tokenEmitter = new CancellationTokenSource();
             document.addLine("; mov");
             let results = await cp.provideCompletionItems(document, position, tokenEmitter.token);
             expect(results).to.be.empty;
-            position = new Position(0, 22);
+            position = new Position(0, 21);
+            document = new DummyTextDocument();
             document.addLine("  move.l d0,a1  ; mov");
             results = await cp.provideCompletionItems(document, position, tokenEmitter.token);
             expect(results).to.be.empty;
@@ -338,7 +339,7 @@ describe("Completion Tests", function () {
                 document.uri = Uri.file(MAIN_SOURCE);
                 const tokenEmitter = new CancellationTokenSource();
                 document.addLine(`  include "${absPath}`);
-                const results = await cp.provideCompletionItems(document, new Position(0, 12 + absPath.length), tokenEmitter.token);
+                const results = await cp.provideCompletionItems(document, new Position(0, 11 + absPath.length), tokenEmitter.token);
                 expect(results.length).to.be.equal(3);
                 expect(results[0].label).to.be.equal("fs-uae/");
                 expect(results[1].label).to.be.equal("gencop.s");
