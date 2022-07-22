@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { DebugProtocol } from '@vscode/debugprotocol';
-import { ASMLine } from './parser';
 
 export class DisassembledMemoryDataProvider implements vscode.TreeDataProvider<ViewLineItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<ViewLineItem | undefined> = new vscode.EventEmitter<ViewLineItem | undefined>();
@@ -23,18 +22,19 @@ export class DisassembledMemoryDataProvider implements vscode.TreeDataProvider<V
         }
     }
     setDisassembledMemory(memory: DebugProtocol.DisassembledInstruction[]): void {
-        this.currentValues = new Array<ViewLineItem>();
-        for (const dl of memory) {
-            const address = dl.address;
-            const asmLine = new ASMLine(` ${dl.instruction}`);
-            const label = `${asmLine.instruction}  ${asmLine.data}`;
-            const item = new ViewLineItem(`${address}: ${label}`);
-            if (dl.instructionBytes) {
-                item.description = dl.instructionBytes;
-            }
-            this.currentValues.push(item);
-        }
-        this.refresh();
+        // TODO:
+        // this.currentValues = new Array<ViewLineItem>();
+        // for (const dl of memory) {
+        //     const address = dl.address;
+        //     const asmLine = new ASMLine(` ${dl.instruction}`);
+        //     const label = `${asmLine.instruction}  ${asmLine.data}`;
+        //     const item = new ViewLineItem(`${address}: ${label}`);
+        //     if (dl.instructionBytes) {
+        //         item.description = dl.instructionBytes;
+        //     }
+        //     this.currentValues.push(item);
+        // }
+        // this.refresh();
     }
 }
 

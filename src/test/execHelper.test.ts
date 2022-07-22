@@ -7,7 +7,6 @@ import { ExtensionState } from '../extension';
 import { DummyTextDocument } from './dummy';
 import { Uri, workspace, TextDocument } from 'vscode';
 import * as Path from 'path';
-import { ASMLine } from '../parser';
 
 describe("Executor Tests", function () {
     const PROJECT_ROOT = Path.join(__dirname, '..', '..');
@@ -19,8 +18,6 @@ describe("Executor Tests", function () {
         if (ext) {
             await ext.activate();
         }
-        const state = ExtensionState.getCurrent();
-        ASMLine.init(await state.getLanguage());
     });
     it("Should execute a command and parse stdout", async () => {
         const stdoutText = 'My Stdout\ntext';

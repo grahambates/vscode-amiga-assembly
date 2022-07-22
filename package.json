@@ -39,7 +39,6 @@
 		"onCommand:amiga-assembly.disassemble-file",
 		"onCommand:amiga-assembly.disassemble-copper",
 		"onCommand:amiga-assembly.disassemble-memory",
-		"onCommand:amiga-assembly.list-used-registers",
 		"onCommand:amiga-assembly.view-iff",
 		"onCommand:amiga-assembly.download-binaries",
 		"onCommand:amiga-assembly.create-example-workspace",
@@ -50,20 +49,6 @@
 	"main": "./dist/extension.js",
 	"contributes": {
 		"languages": [
-			{
-				"id": "m68k",
-				"aliases": [
-					"Amiga-Assembly",
-					"M68k-Assembly",
-					"m68k"
-				],
-				"extensions": [
-					".s",
-					".i",
-					".asm"
-				],
-				"configuration": "./language-configuration.json"
-			},
 			{
 				"id": "amiga-assembly-debug.disassembly",
 				"aliases": [
@@ -76,19 +61,12 @@
 		],
 		"grammars": [
 			{
-				"language": "m68k",
-				"scopeName": "source.asm.m68k",
-				"path": "./syntaxes/M68k-Assembly.tmLanguage.json"
-			},
-			{
 				"language": "amiga-assembly-debug.disassembly",
 				"scopeName": "source.asm.dbgasm",
 				"path": "./syntaxes/Dbg-Assembly.tmLanguage.json"
 			}
 		],
 		"capabilities": {
-			"definitionProvider": "true",
-			"referencesProvider": "true",
 			"codeLensProvider": {
 				"resolveProvider": "true"
 			}
@@ -1063,5 +1041,8 @@
 		"uuid": "^8.3.2",
 		"winston": "^3.8.1",
 		"winston-transport": "^4.5.0"
-	}
+	},
+	"extensionDependencies": [
+		"gigabates.m68k-lsp"
+	]
 }

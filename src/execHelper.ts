@@ -1,10 +1,9 @@
 import * as cp from 'child_process';
 import * as vscode from 'vscode';
-import * as path from 'path';
+// import * as path from 'path';
 import { ExtensionState } from './extension';
 import { workspace, Uri } from 'vscode';
 import * as winston from 'winston';
-import { SymbolFile } from './symbols';
 
 export class ICheckResult {
     file = "";
@@ -164,15 +163,14 @@ export class ExecutorHelper {
                     let text = "";
                     // Processing path of included files
                     if (error.parentFile) {
-                        const definitionHandler = ExtensionState.getCurrent().getDefinitionHandler();
-                        const includedFiles = await definitionHandler.getIncludedFiles(document.uri);
-                        const errorFilename = path.parse(error.file).base;
-                        for (const filename of includedFiles) {
-                            if (filename.endsWith(errorFilename)) {
-                                canonicalFile = filename;
-                                break;
-                            }
-                        }
+                        // const includedFiles = await definitionHandler.getIncludedFiles(document.uri);
+                        // const errorFilename = path.parse(error.file).base;
+                        // for (const filename of includedFiles) {
+                        //     if (filename.endsWith(errorFilename)) {
+                        //         canonicalFile = filename;
+                        //         break;
+                        //     }
+                        // }
                         // Open the document to get the text
                         const sourceDocument = await workspace.openTextDocument(Uri.file(canonicalFile));
                         if (sourceDocument) {
@@ -207,31 +205,31 @@ export class ExecutorHelper {
                     }
                 } else if (error.msg.includes("undefined symbol")) {
                     // parse of the symbol
-                    const pos = error.msg.indexOf("undefined symbol");
-                    if (pos > 0) {
-                        let hasUnderScore = false;
-                        let symbol = error.msg.substring(pos + 17).trim();
-                        if (symbol.endsWith(".")) {
-                            symbol = symbol.substring(0, symbol.length - 1);
-                        }
-                        if (symbol.startsWith("_")) {
-                            symbol = symbol.substring(1, symbol.length);
-                            hasUnderScore = true;
-                        }
-                        // search in file
-                        const sFile = new SymbolFile(Uri.file(error.file));
-                        await sFile.readFile();
-                        for (const fSymbol of sFile.getReferredSymbols()) {
-                            if (fSymbol.getLabel() == symbol) {
-                                const symbolErrorSeverity = this.mapSeverityToVSCodeSeverity(error.severity);
-                                let range = fSymbol.getRange();
-                                if (hasUnderScore && range.start.character > 0) {
-                                    range = new vscode.Range(new vscode.Position(range.start.line, range.start.character - 1), range.end);
-                                }
-                                perErrorDiagnostics.push(new vscode.Diagnostic(range, error.msg, symbolErrorSeverity));
-                            }
-                        }
-                    }
+                //     const pos = error.msg.indexOf("undefined symbol");
+                //     if (pos > 0) {
+                //         let hasUnderScore = false;
+                //         let symbol = error.msg.substring(pos + 17).trim();
+                //         if (symbol.endsWith(".")) {
+                //             symbol = symbol.substring(0, symbol.length - 1);
+                //         }
+                //         if (symbol.startsWith("_")) {
+                //             symbol = symbol.substring(1, symbol.length);
+                //             hasUnderScore = true;
+                //         }
+                //         // search in file
+                //         const sFile = new SymbolFile(Uri.file(error.file));
+                //         await sFile.readFile();
+                //         for (const fSymbol of sFile.getReferredSymbols()) {
+                //             if (fSymbol.getLabel() == symbol) {
+                //                 const symbolErrorSeverity = this.mapSeverityToVSCodeSeverity(error.severity);
+                //                 let range = fSymbol.getRange();
+                //                 if (hasUnderScore && range.start.character > 0) {
+                //                     range = new vscode.Range(new vscode.Position(range.start.line, range.start.character - 1), range.end);
+                //                 }
+                //                 perErrorDiagnostics.push(new vscode.Diagnostic(range, error.msg, symbolErrorSeverity));
+                //             }
+                //         }
+                //     }
                 }
                 const errorRange = new vscode.Range(error.line - 1, startColumn, error.line - 1, endColumn);
                 const errorSeverity = this.mapSeverityToVSCodeSeverity(error.severity);

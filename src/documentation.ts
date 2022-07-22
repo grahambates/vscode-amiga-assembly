@@ -4,12 +4,10 @@ import { Uri } from 'vscode';
 
 export enum DocumentationType {
     UNKNOWN,
-    INSTRUCTION,
-    DIRECTIVE,
     REGISTER,
-    CPU_REGISTER,
     FUNCTION
 }
+
 export class DocumentationElement {
     name = "";
     description = "";
@@ -58,103 +56,6 @@ abstract class DocumentationMDFileFolderManager {
     protected abstract loadFile(filename: string): void;
 }
 
-
-/**
- * Class to manage the instructions
- */
-export class DocumentationInstructionsManager extends DocumentationMDFileFolderManager {
-    private static readonly bccVariants = ["bcc", "bcs", "beq", "bge", "bgt", "bhi", "ble", "bls", "blt", "bmi", "bne", "bpl", "bvc", "bvs", "bhs", "blo"];
-    private static readonly dbccVariants = ["dbcc", "dbt", "dbf", "dbra", "dbhi", "dbls", "dbcc", "dbhs", "dbcs", "dblo", "dbne", "dbvs", "dbeq", "dbpl", "dbvc", "dbmi", "dbge", "dblt", "dbgt", "dble"];
-    private static readonly sccVariants = ["scc", "st", "sf", "shi", "sls", "scc", "shs", "scs", "slo", "sne", "seq", "svc", "svs", "spl", "smi", "sge", "slt", "sgt", "sle"];
-    private instructions = new Map<string, DocumentationInstruction>();
-
-    constructor(extensionPath: string) {
-        super(extensionPath, "instructions");
-    }
-
-    protected loadFile(filename: string): void {
-        let elms = filename.replace(".md", "").split("_");
-        if (elms[0] === "bcc") {
-            elms = DocumentationInstructionsManager.bccVariants;
-        } else if (elms[0] === "dbcc") {
-            elms = DocumentationInstructionsManager.dbccVariants;
-        } else if (elms[0] === "scc") {
-            elms = DocumentationInstructionsManager.sccVariants;
-        }
-        elms.forEach(element => {
-            const filePath = path.join(this.dirPath, filename);
-            const name = element.toUpperCase();
-            const di = new DocumentationInstruction(element, this.dirPath, filePath);
-            this.instructions.set(name, di);
-        });
-    }
-
-    /**
-     * Retrieves an instruction by it's name
-     * @param name Name of the instruction
-     */
-    public async getInstructionByName(name: string): Promise<DocumentationInstruction | undefined> {
-        const instruction = this.instructions.get(name);
-        if (instruction) {
-            await instruction.loadDescription();
-        }
-        return instruction;
-    }
-
-    /**
-     * Iterate on all entries by name.
-     */
-    public entriesByName(): IterableIterator<[string, DocumentationInstruction]> {
-        return this.instructions.entries();
-    }
-
-    public getCount(): number {
-        return this.instructions.size;
-    }
-}
-
-/**
- * Class to manage the directives
- */
-export class DocumentationDirectivesManager extends DocumentationMDFileFolderManager {
-    private directives = new Map<string, DocumentationDirective>();
-
-    constructor(extensionPath: string) {
-        super(extensionPath, "directives");
-    }
-
-    protected loadFile(filename: string): void {
-        const element = filename.replace(".md", "");
-        const filePath = path.join(this.dirPath, filename);
-        const name = element.toUpperCase();
-        const di = new DocumentationDirective(element, this.dirPath, filePath);
-        this.directives.set(name, di);
-    }
-
-    /**
-     * Retrieves an directive by it's name
-     * @param name Name of the directive
-     */
-    public async getDirectiveByName(name: string): Promise<DocumentationDirective | undefined> {
-        const directive = this.directives.get(name);
-        if (directive) {
-            await directive.loadDescription();
-        }
-        return directive;
-    }
-
-    /**
-     * Iterate on all entries by name.
-     */
-    public entriesByName(): IterableIterator<[string, DocumentationDirective]> {
-        return this.directives.entries();
-    }
-
-    public getCount(): number {
-        return this.directives.size;
-    }
-}
-
 export interface DocumentationLazy {
     loadDescription(): Promise<void>;
 }
@@ -162,64 +63,6 @@ export interface DocumentationLazy {
 export function isDocumentationLazy(el: any): el is DocumentationLazy {
     return (el as DocumentationLazy).loadDescription !== undefined;
 }
-
-/**
- * Class representing an instruction documentation
- */
-export class DocumentationInstruction extends DocumentationElement implements DocumentationLazy {
-    filename: string;
-    parentDir: string;
-    loaded: boolean;
-    /**
-     * Constructor
-     * @param name Name
-     * @param parentDir path to the parent dir of the file
-     * @param filename filename of the documentation
-     */
-    constructor(name: string, parentDir: string, filename: string) {
-        super();
-        this.loaded = false;
-        this.name = name;
-        this.filename = filename;
-        this.description = "";
-        this.detail = "instruction";
-        this.parentDir = parentDir;
-        this.type = DocumentationType.INSTRUCTION;
-    }
-
-    private removeImages(text: string): string {
-        let rText = text;
-        // eslint-disable-next-line no-useless-escape
-        const matcher = /[!]?\[([\/\\a-z0-9_\s\.\-]*)\]\(([a-z0-9_\-\/\\\.]*)\)/gi;
-        let match = matcher.exec(text)
-        while (match) {
-            rText = rText.replace(match[0], '');
-            match = matcher.exec(text)
-        }
-        return rText;
-    }
-
-    /**
-     * Lazy loading for descriptions
-     */
-    public async loadDescription(): Promise<void> {
-        if (!this.loaded) {
-            const fProxy = new FileProxy(Uri.file(this.filename), true);
-            const contents = await fProxy.readFileText('utf8');
-            this.description = this.removeImages(contents);
-            this.loaded = true;
-        }
-    }
-}
-
-export class DocumentationDirective extends DocumentationInstruction {
-    constructor(name: string, parentDir: string, filename: string) {
-        super(name, parentDir, filename);
-        this.type = DocumentationType.DIRECTIVE;
-        this.detail = "directive";
-    }
-}
-
 
 /**
  * Class to manage the registers
@@ -337,61 +180,6 @@ export class DocumentationRegister extends DocumentationElement implements Docum
 }
 
 /**
- * Class representing a CPU data register
- */
-export class DocumentationCpuRegister extends DocumentationElement {
-    /**
-     * Constructor
-     * @param name Name
-     */
-    constructor(name: string, detail: string) {
-        super();
-        this.name = name;
-        this.detail = detail;
-        this.description = "";
-        this.type = DocumentationType.CPU_REGISTER;
-    }
-}
-
-
-/**
- * Class to manage the CPU register documentation
- */
-export class DocumentationCpuRegistersManager {
-    public registers = new Map<string, DocumentationCpuRegister>();
-
-    constructor() {
-        for (let i = 0; i < 8; i++) {
-            this.registers.set('A' + i, new DocumentationCpuRegister('A' + i, 'address register'));
-            this.registers.set('D' + i, new DocumentationCpuRegister('D' + i, 'data register'));
-            this.registers.set('FP' + i, new DocumentationCpuRegister('FP' + i, 'floating point register'));
-        }
-        this.registers.set('PC', new DocumentationCpuRegister('PC', 'program counter'));
-        this.registers.set('SP', new DocumentationCpuRegister('SP', 'stack pointer'));
-        this.registers.set('VBR', new DocumentationCpuRegister('VBR', 'vector base register'));
-    }
-
-    /**
-     * Retrieves an register by it's name
-     * @param name Name of the instruction
-     */
-    public async getRegisterByName(name: string): Promise<DocumentationCpuRegister | undefined> {
-        return this.registers.get(name);
-    }
-
-    /**
-     * Iterate on all entries by name.
-     */
-    public entriesByName(): IterableIterator<[string, DocumentationCpuRegister]> {
-        return this.registers.entries();
-    }
-
-    public getCount(): number {
-        return this.registers.size;
-    }
-}
-
-/**
  * Class to manage the libraries documentation
  */
 export class DocumentationLibraryManager {
@@ -466,37 +254,21 @@ export class DocumentationLibraryFunction extends DocumentationElement {
  */
 export class DocumentationManager {
     private isLoaded = false;
-    instructionsManager: DocumentationInstructionsManager;
-    directivesManager: DocumentationDirectivesManager;
     registersManager: DocumentationRegistersManager;
-    cpuRegistersManager: DocumentationCpuRegistersManager;
     libraryManager: DocumentationLibraryManager;
     relevantKeywordsMap: Map<string, Array<DocumentationElement>>;
     constructor(extensionPath: string) {
-        this.instructionsManager = new DocumentationInstructionsManager(extensionPath);
-        this.directivesManager = new DocumentationDirectivesManager(extensionPath);
         this.registersManager = new DocumentationRegistersManager(extensionPath);
-        this.cpuRegistersManager = new DocumentationCpuRegistersManager();
         this.libraryManager = new DocumentationLibraryManager(extensionPath);
         this.relevantKeywordsMap = new Map<string, Array<DocumentationElement>>();
     }
 
     public async load(): Promise<void> {
         if (!this.isLoaded) {
-            await Promise.all([this.instructionsManager.load(),
-            this.directivesManager.load(),
+            await Promise.all([
             this.registersManager.load(),
             this.libraryManager.load()]);
-            for (const [key, value] of this.instructionsManager.entriesByName()) {
-                this.addRelevantKeywordElements(key, value);
-            }
-            for (const [key, value] of this.directivesManager.entriesByName()) {
-                this.addRelevantKeywordElements(key, value);
-            }
             for (const [key, value] of this.registersManager.entriesByName()) {
-                this.addRelevantKeywordElements(key, value);
-            }
-            for (const [key, value] of this.cpuRegistersManager.entriesByName()) {
                 this.addRelevantKeywordElements(key, value);
             }
             for (const [key, value] of this.libraryManager.functionsByName.entries()) {
@@ -517,20 +289,11 @@ export class DocumentationManager {
         }
     }
 
-    public getInstruction(instruction: string): Promise<DocumentationInstruction | undefined> {
-        return this.instructionsManager.getInstructionByName(instruction.toUpperCase());
-    }
-    public getDirective(directive: string): Promise<DocumentationInstruction | undefined> {
-        return this.directivesManager.getDirectiveByName(directive.toUpperCase());
-    }
     public getRegisterByAddress(address: string): Promise<DocumentationRegister | undefined> {
         return this.registersManager.getRegistersByAddress(address);
     }
     public getRegisterByName(name: string): Promise<DocumentationRegister | undefined> {
         return this.registersManager.getRegistersByName(name);
-    }
-    public getCpuRegister(name: string): Promise<DocumentationCpuRegister | undefined> {
-        return this.cpuRegistersManager.getRegisterByName(name);
     }
     public getFunction(functionName: string): Promise<DocumentationLibraryFunction | undefined> {
         return this.libraryManager.loadDescription(functionName);
